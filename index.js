@@ -5,19 +5,20 @@ const path = require('path');
 const csvParser = require('csv-parser');
 
 
-var count = '0';
-var letter = 'B';
+// var count = '0';
+// var letter = 'B';
 
 
 async function getData() {
     try {
         const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
         for (let letter of alphabet) {
+			letter = letter;
             const csvFilePath = path.join(__dirname, `${letter}.csv`);
             const data = await readCSVFile(csvFilePath);
             if (data) {
                 console.log(`Processing data from ${letter}.csv`);
-                const artistsData = await processCSVData(data);
+                const artistsData = await processCSVData(data, letter);
                 // const jsonString = JSON.stringify(artistsData, null, 4);  // Adding indentation for better readability
                 // const outputFilePath = `prices/data_${letter}.json`;
                 // fs.writeFileSync(outputFilePath, jsonString);
@@ -46,14 +47,14 @@ async function readCSVFile(filePath) {
 }
 
 
-async function processCSVData(data) {
+async function processCSVData(data, letter) {
 	// try {
 		// let filePath = "pages.json";
 		// const jsonData = fs.readFileSync(filePath, 'utf8');
 		// const data = JSON.parse(jsonData);
 		var product_page = [];
 		var len = data.length;
-		for (let i = 564; i < len; i++) {
+		for (let i = 0; i < len; i++) {
 			console.log(`${i} of ${len}`);
 			var page = {
 				id: "",
@@ -90,7 +91,7 @@ async function processCSVData(data) {
 			});
 			page.sizes = await getFrames(page);
 			// console.log(page);
-			addPaintingToArtistData(page, product_page);
+			addPaintingToArtistData(page, product_page, letter);
 		}
 		return product_page;
 
@@ -148,7 +149,7 @@ async function getFrames(product_page) {
 
 }
 
-function addPaintingToArtistData(painting, artistsData) {
+function addPaintingToArtistData(painting, artistsData, letter) {
     const artistIndex = artistsData.findIndex((artistData) => artistData.Artist === painting.artist);
     if (artistIndex !== -1) {
         artistsData[artistIndex].Paintings.push(painting);
