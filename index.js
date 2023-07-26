@@ -4,30 +4,21 @@ const cheerio = require('cheerio');
 const path = require('path');
 const csvParser = require('csv-parser');
 
-
-var count = '0';
-var letter = 'B';
-
+var letter = 'W';
 
 async function getData() {
     try {
-        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        for (let letter of alphabet) {
-            const csvFilePath = path.join(__dirname, `${letter}.csv`);
-            const data = await readCSVFile(csvFilePath);
-            if (data) {
-                console.log(`Processing data from ${letter}.csv`);
-                const artistsData = await processCSVData(data);
-                // const jsonString = JSON.stringify(artistsData, null, 4);  // Adding indentation for better readability
-                // const outputFilePath = `prices/data_${letter}.json`;
-                // fs.writeFileSync(outputFilePath, jsonString);
-                // console.log(`Data for ${letter} written to ${outputFilePath}`);
-            }
-        }
+		const csvFilePath = path.join(__dirname, `${letter}.csv`);
+		const data = await readCSVFile(csvFilePath);
+		if (data) {
+			console.log(`Processing data from ${letter}.csv`);
+			await processCSVData(data, letter);
+		}
     } catch (error) {
         console.error('Error processing CSV files:', error);
     }
 }
+
 async function readCSVFile(filePath) {
     return new Promise((resolve, reject) => {
         const data = [];
@@ -45,55 +36,46 @@ async function readCSVFile(filePath) {
     });
 }
 
-
-async function processCSVData(data) {
-	// try {
-		// let filePath = "pages.json";
-		// const jsonData = fs.readFileSync(filePath, 'utf8');
-		// const data = JSON.parse(jsonData);
+async function processCSVData(data, letter) {
+	var len = data.length;
+	for (let i = 0; i < len; i++) {
 		var product_page = [];
-		var len = data.length;
-		for (let i = 564; i < len; i++) {
-			console.log(`${i} of ${len}`);
-			var page = {
-				id: "",
-				link: "",
-				title: "",
-				image: "",
-				artist: "",
-				options: {
-					"keys": [],
-					"values": []
-				},
-				sizes : {}
-			}
-			const item = data[i];
-			page.title = item.Title;
-			page.artist = item.Artist;
-			page.link = item.Link;
-
-			// const jsonFileName = `${page.artist}.json`;
-			const response = await axios.get(page.link);
-			const html = response.data;
-			const $ = cheerio.load(html);
-			page.id = $("#box-10552 > div > span").text();
-			console.log(page.id);
-			page.image = "https://www.oilpaintings.com" + $(".main-image").attr("src");
-
-			const labels = $(".radio-attributes-content > label");
-			labels.each((index, element) => {
-				const key = $(element).find("span").text()
-				const value = $(element).find("input").val();
-				page.options.keys.push(key);
-				page.options.values.push(value);
-
-			});
-			page.sizes = await getFrames(page);
-			// console.log(page);
-			addPaintingToArtistData(page, product_page);
+		console.log(`${i} of ${len}`);
+		var page = {
+			id: "",
+			link: "",
+			title: "",
+			image: "",
+			artist: "",
+			options: {
+				"keys": [],
+				"values": []
+			},
+			sizes : {}
 		}
-		return product_page;
+		const item = data[i];
+		page.title = item.Title;
+		page.artist = item.Artist;
+		page.link = item.Link;
 
+		const response = await axios.get(page.link);
+		const html = response.data;
+		const $ = cheerio.load(html);
+		page.id = $("#box-10552 > div > span").text();
+		console.log(page.id);
+		page.image = "https://www.oilpaintings.com" + $(".main-image").attr("src");
+
+		const labels = $(".radio-attributes-content > label");
+		labels.each((index, element) => {
+			const key = $(element).find("span").text()
+			const value = $(element).find("input").val();
+			page.options.keys.push(key);
+			page.options.values.push(value);
+
+		});
+		page.sizes = await getFrames(page);
+		addPaintingToArtistData(page, product_page, letter);
+	}
 }
 
 
@@ -139,7 +121,6 @@ async function getFrames(product_page) {
 		} catch (error) {
 			console.error('Error fetching product options:', error.message);
 		}
-	
 		sizes[value] = size;
 	
 		return sizes;
@@ -148,40 +129,37 @@ async function getFrames(product_page) {
 
 }
 
-function addPaintingToArtistData(painting, artistsData) {
-    const artistIndex = artistsData.findIndex((artistData) => artistData.Artist === painting.artist);
+function addPaintingToArtistData(painting, artistsData, letter) {
+
+	const jsonFileName = `prices/data_${letter}.json`;
+	let jsonData;
+	try {
+		const fileData = fs.readFileSync(jsonFileName, 'utf8');
+		jsonData = JSON.parse(fileData);
+	} catch (err) {
+		jsonData = [];
+	}
+	console.log(` ==> ${painting.artist}`);
+
+    const artistIndex = jsonData.findIndex((artistData) => artistData.Artist === painting.artist);
+    console.log(`===> ${artistIndex}`);
     if (artistIndex !== -1) {
-        artistsData[artistIndex].Paintings.push(painting);
+        jsonData[artistIndex].Paintings.push(painting);
     } else {
         const artistData = {
             Artist: painting.artist,
             Paintings: [painting]
         };
-        artistsData.push(artistData);
+        jsonData.push(artistData);
     }
 
-	const jsonFileName = `prices/data_${letter}.json`;
-    const jsonString = JSON.stringify(artistsData, null, 4); // Adding indentation for better readability
-
+    const jsonString = JSON.stringify(jsonData, null, 4);
     try {
         fs.writeFileSync(jsonFileName, jsonString);
         console.log(`Successfully updated file ${jsonFileName}`);
     } catch (err) {
         console.log('Error writing file', err);
     }
-}
-
-
-function appendToFile(filename, data) {
-    return new Promise((resolve, reject) => {
-        fs.appendFile(filename, data, err => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve();
-            }
-        });
-    });
 }
 
 function sleep(ms) {
